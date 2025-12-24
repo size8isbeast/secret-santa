@@ -62,6 +62,7 @@ class MockStore {
       roundStartedAt: Date.now(),
       durationSec: this.roomState.durationSec,
       isStarted: true,
+      resultsUnlocked: false,
     };
     this.notifyListeners();
   }
