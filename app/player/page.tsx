@@ -5,6 +5,7 @@ import { store, ALL_PLAYERS } from '@/lib/store';
 import { useRoomState } from '@/lib/hooks/useRoomState';
 import { useTimer } from '@/lib/hooks/useTimer';
 import { Timer } from '@/components/Timer';
+import Link from 'next/link';
 
 export default function PlayerPage() {
   const roomState = useRoomState();
@@ -16,12 +17,18 @@ export default function PlayerPage() {
   const currentRecipient = store.getCurrentRecipient();
   const isRecipient = playerName === currentRecipient;
   const roundIndex = roomState.currentIndex;
+  const isLastRound =
+    roomState.isStarted &&
+    roomState.currentIndex >= roomState.openingOrder.length - 1;
 
   // Track timer state to disable submit button when time runs out
   const { isExpired } = useTimer({
     startedAt: roomState.roundStartedAt,
     durationSec: roomState.durationSec,
   });
+
+  // Check if player is done with all rounds
+  const isPlayerDone = isLastRound && (hasSubmittedThisRound || isRecipient);
 
   // Debug logging
   useEffect(() => {
@@ -51,6 +58,8 @@ export default function PlayerPage() {
 
   const handleSelectPlayer = (name: string) => {
     setPlayerName(name);
+    // Register player as active
+    store.registerPlayer(name);
   };
 
   const handleSubmitGuess = async () => {
@@ -96,27 +105,62 @@ export default function PlayerPage() {
   // Identity selection screen
   if (!playerName) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-gray-800 mb-4">
-              Who are you?
-            </h1>
-            <p className="text-xl text-gray-600">
-              Select your name to start playing
-            </p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-8 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-3xl shadow-2xl p-12">
+            <div className="text-center mb-8">
+              <div className="text-6xl mb-4">👤</div>
+              <h1 className="text-4xl font-bold text-gray-800 mb-4">
+                Enter Your Name
+              </h1>
+              <p className="text-lg text-gray-600">
+                Type your name to start playing
+              </p>
+            </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {ALL_PLAYERS.map((name) => (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const input = e.currentTarget.elements.namedItem('playerName') as HTMLInputElement;
+                const name = input.value.trim();
+                if (name) {
+                  handleSelectPlayer(name);
+                }
+              }}
+              className="space-y-6"
+            >
+              <input
+                type="text"
+                name="playerName"
+                placeholder="Your name"
+                autoFocus
+                required
+                className="w-full px-6 py-4 text-2xl text-gray-900 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-center placeholder:text-gray-400"
+              />
               <button
-                key={name}
-                onClick={() => handleSelectPlayer(name)}
-                className="bg-white hover:bg-blue-100 text-gray-800 text-xl font-semibold py-6 px-4 rounded-xl shadow-lg transition-all transform hover:scale-105 border-2 border-transparent hover:border-blue-500"
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-2xl font-bold py-4 rounded-xl shadow-lg transition-all transform hover:scale-105"
               >
-                {name}
+                Continue
               </button>
-            ))}
+            </form>
+
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-500 text-center mb-4">
+                Quick select:
+              </p>
+              <div className="flex gap-2 justify-center">
+                {ALL_PLAYERS.map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => handleSelectPlayer(name)}
+                    className="bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 px-4 py-2 rounded-lg font-semibold transition-all text-sm"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -171,7 +215,38 @@ export default function PlayerPage() {
 
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          {isRecipient ? (
+          {isPlayerDone ? (
+            // Player is done with all rounds
+            <div className="text-center py-12">
+              <div className="text-8xl mb-6">🎉</div>
+              <div className="text-5xl font-bold text-green-600 mb-6">
+                You&apos;re All Done!
+              </div>
+              <div className="text-2xl text-gray-600 mb-4">
+                Great job! You&apos;ve submitted all your guesses.
+              </div>
+              <div className="text-xl text-gray-500 mb-8">
+                {roomState.resultsUnlocked
+                  ? 'Results are now available!'
+                  : 'Waiting for host to unlock results...'}
+              </div>
+              {roomState.resultsUnlocked ? (
+                <Link
+                  href="/results"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-2xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                >
+                  📊 View Results
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="inline-block bg-gray-300 text-gray-500 text-2xl font-bold py-4 px-8 rounded-xl shadow-lg cursor-not-allowed"
+                >
+                  📊 View Results (Locked)
+                </button>
+              )}
+            </div>
+          ) : isRecipient ? (
             // Skip view - player is the recipient
             <div className="text-center py-12">
               <div className="text-6xl mb-6">🎁</div>
@@ -204,7 +279,7 @@ export default function PlayerPage() {
               </h2>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-                {ALL_PLAYERS.filter((name) => name !== currentRecipient).map(
+                {roomState.openingOrder.filter((name) => name !== currentRecipient).map(
                   (name) => (
                     <button
                       key={name}

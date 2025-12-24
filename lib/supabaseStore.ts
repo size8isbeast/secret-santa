@@ -92,6 +92,7 @@ class SupabaseStore {
             : null,
           durationSec: data.duration_sec || 90,
           isStarted: data.is_started || false,
+          resultsUnlocked: data.results_unlocked || false,
         };
         this.notifyListeners();
       }
@@ -126,6 +127,7 @@ class SupabaseStore {
                 : null,
               durationSec: data.duration_sec || 90,
               isStarted: data.is_started || false,
+              resultsUnlocked: data.results_unlocked || false,
             };
             console.log('🟢 State updated:', this.currentState);
             this.notifyListeners();
@@ -180,8 +182,37 @@ class SupabaseStore {
         roundStartedAt: null,
         durationSec: 90,
         isStarted: false,
+        resultsUnlocked: false,
       }
     );
+  }
+
+  // Player: Register as active player
+  async registerPlayer(playerName: string): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      // Get current active players
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('active_players')
+        .eq('id', this.roomId)
+        .single();
+
+      const activePlayers = room?.active_players || [];
+
+      // Add player if not already in the list
+      if (!activePlayers.includes(playerName)) {
+        await supabase
+          .from('rooms')
+          .update({
+            active_players: [...activePlayers, playerName],
+          })
+          .eq('id', this.roomId);
+      }
+    } catch (error) {
+      console.error('Error registering player:', error);
+    }
   }
 
   // Host: Start the game with randomized order
@@ -189,7 +220,18 @@ class SupabaseStore {
     if (!supabase) return;
 
     try {
-      const shuffled = [...ALL_PLAYERS].sort(() => Math.random() - 0.5);
+      // Get active players who have entered
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('active_players')
+        .eq('id', this.roomId)
+        .single();
+
+      const activePlayers = room?.active_players || [];
+
+      // Use active players if any, otherwise fall back to ALL_PLAYERS
+      const playersToUse = activePlayers.length > 0 ? activePlayers : ALL_PLAYERS;
+      const shuffled = [...playersToUse].sort(() => Math.random() - 0.5);
       console.log('🎮 Starting game with order:', shuffled);
 
       // Use server-side function to ensure timestamp sync across all clients
@@ -360,6 +402,49 @@ class SupabaseStore {
     return state.openingOrder[state.currentIndex] ?? null;
   }
 
+  // Get active players who have entered
+  async getActivePlayers(): Promise<string[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('active_players')
+        .eq('id', this.roomId)
+        .single();
+
+      return room?.active_players || [];
+    } catch (error) {
+      console.error('Error fetching active players:', error);
+      return [];
+    }
+  }
+
+  // Unlock results (called when host visits results page)
+  async unlockResults(): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      const { error } = await supabase.rpc('unlock_results', {
+        p_room_id: this.roomId,
+      });
+
+      if (error) {
+        // Fallback to direct update if function doesn't exist
+        console.warn('Using fallback method:', error);
+        await supabase
+          .from('rooms')
+          .update({ results_unlocked: true })
+          .eq('id', this.roomId);
+      }
+
+      // Fetch updated state
+      await this.fetchRoomState();
+    } catch (error) {
+      console.error('Error unlocking results:', error);
+    }
+  }
+
   // Reset the entire game
   async reset(): Promise<void> {
     if (!supabase) return;
@@ -373,6 +458,8 @@ class SupabaseStore {
           current_index: 0,
           round_started_at: null,
           is_started: false,
+          active_players: [],
+          results_unlocked: false,
         })
         .eq('id', this.roomId);
 

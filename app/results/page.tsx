@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { store, ALL_PLAYERS } from '@/lib/store';
 import { useRoomState } from '@/lib/hooks/useRoomState';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 interface Submission {
   player_name: string;
@@ -12,13 +13,25 @@ interface Submission {
 }
 
 export default function ResultsPage() {
+  const searchParams = useSearchParams();
+  const isHost = searchParams.get('role') === 'host';
+
   const roomState = useRoomState();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isGameFinished =
+    roomState.isStarted &&
+    roomState.currentIndex >= roomState.openingOrder.length - 1;
+
   useEffect(() => {
     fetchSubmissions();
-  }, []);
+
+    // If host visits, unlock results for players
+    if (isHost) {
+      store.unlockResults();
+    }
+  }, [isHost]);
 
   const fetchSubmissions = async () => {
     try {
@@ -59,12 +72,14 @@ export default function ResultsPage() {
           <p className="text-xl text-gray-600">
             See who guessed who for each round
           </p>
-          <Link
-            href="/host"
-            className="inline-block mt-4 text-blue-600 hover:text-blue-800 underline"
-          >
-            ← Back to Host View
-          </Link>
+          {isHost && (
+            <Link
+              href="/host"
+              className="inline-block mt-4 text-blue-600 hover:text-blue-800 underline"
+            >
+              ← Back to Host View
+            </Link>
+          )}
         </div>
 
         {/* Game Status */}
@@ -73,8 +88,12 @@ export default function ResultsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <div className="text-sm text-gray-600">Status</div>
-              <div className="text-lg font-bold text-green-600">
-                {roomState.isStarted ? 'In Progress' : 'Not Started'}
+              <div className={`text-lg font-bold ${
+                isGameFinished ? 'text-purple-600' :
+                roomState.isStarted ? 'text-green-600' :
+                'text-gray-600'
+              }`}>
+                {isGameFinished ? 'Finished' : roomState.isStarted ? 'In Progress' : 'Not Started'}
               </div>
             </div>
             <div>
@@ -151,29 +170,49 @@ export default function ResultsPage() {
                         <thead>
                           <tr className="border-b-2 border-gray-200">
                             <th className="text-left py-3 px-4 text-gray-600 font-semibold">
-                              Player
+                              Guessed Santa
                             </th>
                             <th className="text-left py-3 px-4 text-gray-600 font-semibold">
-                              Guessed Santa
+                              Players
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {roundSubs.map((sub, idx) => (
-                            <tr
-                              key={idx}
-                              className="border-b border-gray-100 hover:bg-gray-50"
-                            >
-                              <td className="py-3 px-4 font-medium text-gray-800">
-                                {sub.player_name}
-                              </td>
-                              <td className="py-3 px-4">
-                                <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
-                                  {sub.guessed_santa_name}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {(() => {
+                            // Group submissions by guessed_santa_name
+                            const grouped = roundSubs.reduce((acc, sub) => {
+                              if (!acc[sub.guessed_santa_name]) {
+                                acc[sub.guessed_santa_name] = [];
+                              }
+                              acc[sub.guessed_santa_name].push(sub.player_name);
+                              return acc;
+                            }, {} as Record<string, string[]>);
+
+                            return Object.entries(grouped).map(([santaName, players]) => (
+                              <tr
+                                key={santaName}
+                                className="border-b border-gray-100 hover:bg-gray-50"
+                              >
+                                <td className="py-3 px-4">
+                                  <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
+                                    {santaName}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex flex-wrap gap-2">
+                                    {players.map((player, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-lg font-medium"
+                                      >
+                                        {player}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            ));
+                          })()}
                         </tbody>
                       </table>
                     </div>

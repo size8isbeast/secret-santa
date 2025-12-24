@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { store } from '@/lib/store';
 import { useRoomState } from '@/lib/hooks/useRoomState';
+import { useTimer } from '@/lib/hooks/useTimer';
 import { Timer } from '@/components/Timer';
 import Link from 'next/link';
 
@@ -12,12 +13,34 @@ export default function HostPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [keyInput, setKeyInput] = useState('');
   const [error, setError] = useState('');
+  const [activePlayers, setActivePlayers] = useState<string[]>([]);
 
   const roomState = useRoomState();
   const currentRecipient = store.getCurrentRecipient();
-  const isGameOver =
+  const isLastRound =
     roomState.isStarted &&
     roomState.currentIndex >= roomState.openingOrder.length - 1;
+
+  // Track timer for last round
+  const { isExpired } = useTimer({
+    startedAt: roomState.roundStartedAt,
+    durationSec: roomState.durationSec,
+  });
+
+  const isGameOver = isLastRound && isExpired;
+
+  // Fetch active players periodically
+  useEffect(() => {
+    const fetchActivePlayers = async () => {
+      const players = await store.getActivePlayers();
+      setActivePlayers(players);
+    };
+
+    fetchActivePlayers();
+    const interval = setInterval(fetchActivePlayers, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleKeySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,25 +129,44 @@ export default function HostPage() {
               Round {roomState.currentIndex + 1} of {roomState.openingOrder.length}
             </div>
           )}
-          <Link
-            href="/results"
-            className="inline-block mt-4 text-blue-600 hover:text-blue-800 text-lg font-semibold underline"
-          >
-            📊 View Results Dashboard
-          </Link>
         </div>
 
         {/* Main Content */}
         {!roomState.isStarted ? (
           // Pre-game view
           <div className="text-center space-y-8">
-            <div className="bg-white rounded-2xl shadow-xl p-12">
-              <p className="text-3xl text-gray-700 mb-8">
-                Ready to start the gift opening?
+            {/* Players who have entered */}
+            <div className="bg-white rounded-2xl shadow-xl p-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                Players Ready
+              </h2>
+              {activePlayers.length > 0 ? (
+                <div className="flex flex-wrap gap-3 justify-center mb-6">
+                  {activePlayers.map((player, index) => (
+                    <div
+                      key={index}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-full font-semibold text-lg shadow-lg"
+                    >
+                      {player}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-lg mb-6">
+                  Waiting for players to enter...
+                </p>
+              )}
+              <p className="text-sm text-gray-600 mb-8">
+                {activePlayers.length} player{activePlayers.length !== 1 ? 's' : ''} ready
               </p>
               <button
                 onClick={handleStart}
-                className="bg-red-600 hover:bg-red-700 text-white text-4xl font-bold py-6 px-16 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                disabled={activePlayers.length === 0}
+                className={`text-4xl font-bold py-6 px-16 rounded-xl shadow-lg transition-all transform ${
+                  activePlayers.length > 0
+                    ? 'bg-red-600 hover:bg-red-700 text-white hover:scale-105'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
                 Start Game
               </button>
@@ -132,11 +174,11 @@ export default function HostPage() {
             <div className="bg-blue-50 rounded-xl p-6 max-w-2xl mx-auto">
               <h2 className="text-xl font-semibold mb-3">How it works:</h2>
               <ul className="text-left text-gray-700 space-y-2">
+                <li>• Players enter their names on the player screen</li>
                 <li>• Click Start to randomize the opening order</li>
                 <li>• Each person opens their gift when their name appears</li>
                 <li>• Players guess who their Secret Santa is</li>
                 <li>• Click Next to move to the next person</li>
-                <li>• Players skip submitting when they are the recipient</li>
               </ul>
             </div>
           </div>
@@ -157,32 +199,42 @@ export default function HostPage() {
 
             {/* Controls */}
             <div className="flex gap-4 justify-center">
-              {!isGameOver ? (
-                <button
-                  onClick={handleNext}
-                  className="bg-green-600 hover:bg-green-700 text-white text-3xl font-bold py-6 px-12 rounded-xl shadow-lg transition-all transform hover:scale-105"
-                >
-                  Next →
-                </button>
-              ) : (
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-green-600 mb-4">
+              {isLastRound ? (
+                <div className="text-center w-full">
+                  <div className="text-4xl font-bold text-green-600 mb-6">
                     🎉 All Done! 🎉
                   </div>
+                  <div className="flex gap-4 justify-center">
+                    <Link
+                      href="/results?role=host"
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-2xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 inline-block"
+                    >
+                      📊 View Results
+                    </Link>
+                    <button
+                      onClick={handleReset}
+                      className="bg-gray-600 hover:bg-gray-700 text-white text-2xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all"
+                    >
+                      Reset Game
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleNext}
+                    className="bg-green-600 hover:bg-green-700 text-white text-3xl font-bold py-6 px-12 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                  >
+                    Next →
+                  </button>
                   <button
                     onClick={handleReset}
-                    className="bg-gray-600 hover:bg-gray-700 text-white text-2xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all"
+                    className="bg-gray-400 hover:bg-gray-500 text-white text-xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all"
                   >
-                    Reset Game
+                    Reset
                   </button>
-                </div>
+                </>
               )}
-              <button
-                onClick={handleReset}
-                className="bg-gray-400 hover:bg-gray-500 text-white text-xl font-bold py-4 px-8 rounded-xl shadow-lg transition-all"
-              >
-                Reset
-              </button>
             </div>
 
             {/* Progress bar */}

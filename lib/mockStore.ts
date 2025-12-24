@@ -16,8 +16,10 @@ class MockStore {
     roundStartedAt: null,
     durationSec: 90, // Default 90 seconds per round
     isStarted: false,
+    resultsUnlocked: false,
   };
 
+  private activePlayers: Set<string> = new Set();
   private submissions: Map<string, Submission> = new Map();
   private listeners: Set<RoomStateListener> = new Set();
 
@@ -42,9 +44,18 @@ class MockStore {
     return { ...this.roomState };
   }
 
+  // Player: Register as active player
+  registerPlayer(playerName: string): void {
+    this.activePlayers.add(playerName);
+  }
+
   // Host: Start the game with randomized order
   startGame(): void {
-    const shuffled = [...ALL_PLAYERS].sort(() => Math.random() - 0.5);
+    // Use active players if any, otherwise fall back to ALL_PLAYERS
+    const playersArray = this.activePlayers.size > 0
+      ? Array.from(this.activePlayers)
+      : ALL_PLAYERS;
+    const shuffled = [...playersArray].sort(() => Math.random() - 0.5);
     this.roomState = {
       openingOrder: shuffled,
       currentIndex: 0,
@@ -121,6 +132,20 @@ class MockStore {
     return this.roomState.openingOrder[this.roomState.currentIndex] ?? null;
   }
 
+  // Get active players who have entered
+  getActivePlayers(): string[] {
+    return Array.from(this.activePlayers);
+  }
+
+  // Unlock results (called when host visits results page)
+  unlockResults(): void {
+    this.roomState = {
+      ...this.roomState,
+      resultsUnlocked: true,
+    };
+    this.notifyListeners();
+  }
+
   // Reset the entire game (for testing)
   reset(): void {
     this.roomState = {
@@ -129,7 +154,9 @@ class MockStore {
       roundStartedAt: null,
       durationSec: 90,
       isStarted: false,
+      resultsUnlocked: false,
     };
+    this.activePlayers.clear();
     this.submissions.clear();
     this.notifyListeners();
   }

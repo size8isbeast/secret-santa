@@ -6,6 +6,7 @@ export interface RoomState {
   roundStartedAt: number | null; // Timestamp when current round started (ms)
   durationSec: number; // Timer duration in seconds
   isStarted: boolean;
+  resultsUnlocked: boolean; // Whether host has unlocked results for players
 }
 
 export interface Submission {
