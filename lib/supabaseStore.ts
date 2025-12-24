@@ -178,15 +178,28 @@ class SupabaseStore {
     try {
       const shuffled = [...ALL_PLAYERS].sort(() => Math.random() - 0.5);
 
-      await supabase
-        .from('rooms')
-        .update({
-          opening_order: shuffled,
-          current_index: 0,
-          round_started_at: new Date().toISOString(),
-          is_started: true,
-        })
-        .eq('id', this.roomId);
+      // Use server-side function to ensure timestamp sync across all clients
+      const { data, error } = await supabase.rpc('start_game_with_server_time', {
+        p_room_id: this.roomId,
+        p_opening_order: shuffled,
+      });
+
+      if (error) {
+        // Fallback to client-side if function doesn't exist yet
+        console.warn('Using fallback method:', error);
+        await supabase
+          .from('rooms')
+          .update({
+            opening_order: shuffled,
+            current_index: 0,
+            round_started_at: new Date().toISOString(),
+            is_started: true,
+          })
+          .eq('id', this.roomId);
+      }
+
+      // Fetch updated state to ensure we have the server timestamp
+      await this.fetchRoomState();
     } catch (error) {
       console.error('Error starting game:', error);
     }
@@ -201,13 +214,25 @@ class SupabaseStore {
       if (!state.isStarted) return;
       if (state.currentIndex >= state.openingOrder.length - 1) return;
 
-      await supabase
-        .from('rooms')
-        .update({
-          current_index: state.currentIndex + 1,
-          round_started_at: new Date().toISOString(),
-        })
-        .eq('id', this.roomId);
+      // Use server-side function to ensure timestamp sync across all clients
+      const { data, error } = await supabase.rpc('next_round_with_server_time', {
+        p_room_id: this.roomId,
+      });
+
+      if (error) {
+        // Fallback to client-side if function doesn't exist yet
+        console.warn('Using fallback method:', error);
+        await supabase
+          .from('rooms')
+          .update({
+            current_index: state.currentIndex + 1,
+            round_started_at: new Date().toISOString(),
+          })
+          .eq('id', this.roomId);
+      }
+
+      // Fetch updated state to ensure we have the server timestamp
+      await this.fetchRoomState();
     } catch (error) {
       console.error('Error advancing to next recipient:', error);
     }
