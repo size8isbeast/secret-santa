@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { store, ALL_PLAYERS } from '@/lib/store';
 import { useRoomState } from '@/lib/hooks/useRoomState';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ interface Submission {
   guessed_santa_name: string;
 }
 
-export default function ResultsPage() {
+function ResultsContent() {
   const searchParams = useSearchParams();
   const isHost = searchParams.get('role') === 'host';
 
@@ -259,5 +259,17 @@ export default function ResultsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-2xl text-gray-600">Loading results...</div>
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
   );
 }
