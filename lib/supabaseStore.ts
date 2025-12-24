@@ -35,10 +35,12 @@ class SupabaseStore {
   private listeners: Set<RoomStateListener> = new Set();
   private realtimeChannel: RealtimeChannel | null = null;
   private currentState: RoomState | null = null;
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.initializeRoom();
     this.setupRealtimeSubscription();
+    this.setupPollingFallback();
   }
 
   // Initialize the room if it doesn't exist
@@ -116,6 +118,7 @@ class SupabaseStore {
           filter: `id=eq.${this.roomId}`,
         },
         (payload) => {
+          console.log('🔴 Realtime update received:', payload);
           if (payload.new) {
             const data = payload.new as any;
             this.currentState = {
@@ -127,11 +130,24 @@ class SupabaseStore {
               durationSec: data.duration_sec || 90,
               isStarted: data.is_started || false,
             };
+            console.log('🟢 State updated:', this.currentState);
             this.notifyListeners();
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
+  }
+
+  // Setup polling as fallback for realtime
+  private setupPollingFallback(): void {
+    if (typeof window === 'undefined') return; // Only in browser
+
+    // Poll every 2 seconds as fallback
+    this.pollingInterval = setInterval(() => {
+      this.fetchRoomState();
+    }, 2000);
   }
 
   // Subscribe to room state changes
@@ -177,6 +193,7 @@ class SupabaseStore {
 
     try {
       const shuffled = [...ALL_PLAYERS].sort(() => Math.random() - 0.5);
+      console.log('🎮 Starting game with order:', shuffled);
 
       // Use server-side function to ensure timestamp sync across all clients
       const { data, error } = await supabase.rpc('start_game_with_server_time', {
@@ -186,8 +203,8 @@ class SupabaseStore {
 
       if (error) {
         // Fallback to client-side if function doesn't exist yet
-        console.warn('Using fallback method:', error);
-        await supabase
+        console.warn('⚠️ Using fallback method:', error);
+        const { error: updateError } = await supabase
           .from('rooms')
           .update({
             opening_order: shuffled,
@@ -196,12 +213,20 @@ class SupabaseStore {
             is_started: true,
           })
           .eq('id', this.roomId);
+
+        if (updateError) {
+          console.error('❌ Update failed:', updateError);
+        } else {
+          console.log('✅ Fallback update successful');
+        }
+      } else {
+        console.log('✅ Server-side function executed:', data);
       }
 
       // Fetch updated state to ensure we have the server timestamp
       await this.fetchRoomState();
     } catch (error) {
-      console.error('Error starting game:', error);
+      console.error('❌ Error starting game:', error);
     }
   }
 
@@ -344,6 +369,9 @@ class SupabaseStore {
   disconnect(): void {
     if (this.realtimeChannel) {
       this.realtimeChannel.unsubscribe();
+    }
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
     }
   }
 }
