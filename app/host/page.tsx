@@ -30,10 +30,12 @@ export default function HostPage() {
   };
 
   const handleStart = () => {
+    console.log('🚀 Host clicked Start Game');
     store.startGame();
   };
 
   const handleNext = () => {
+    console.log('➡️ Host clicked Next Round');
     store.nextRecipient();
   };
 

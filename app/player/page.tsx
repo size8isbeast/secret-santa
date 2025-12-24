@@ -23,6 +23,16 @@ export default function PlayerPage() {
     durationSec: roomState.durationSec,
   });
 
+  // Debug logging
+  useEffect(() => {
+    console.log('👤 Player Page Loaded');
+    console.log('🎮 Room State:', roomState);
+  }, []);
+
+  useEffect(() => {
+    console.log('🔄 Room state changed:', roomState);
+  }, [roomState]);
+
   // Check if already submitted for this round
   useEffect(() => {
     if (playerName) {

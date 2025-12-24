@@ -38,6 +38,9 @@ class SupabaseStore {
   private pollingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      console.log('🎅 SupabaseStore initialized in browser');
+    }
     this.initializeRoom();
     this.setupRealtimeSubscription();
     this.setupPollingFallback();
@@ -45,7 +48,12 @@ class SupabaseStore {
 
   // Initialize the room if it doesn't exist
   private async initializeRoom(): Promise<void> {
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn('⚠️ Supabase client not available');
+      return;
+    }
+
+    console.log('🔧 Initializing room:', this.roomId);
 
     try {
       const { data: existingRoom } = await supabase
@@ -55,6 +63,7 @@ class SupabaseStore {
         .single();
 
       if (!existingRoom) {
+        console.log('📝 Creating new room');
         // Create default room
         await supabase.from('rooms').insert({
           id: this.roomId,
@@ -64,12 +73,14 @@ class SupabaseStore {
           duration_sec: 90,
           is_started: false,
         });
+      } else {
+        console.log('✅ Room exists:', existingRoom);
       }
 
       // Load initial state
       await this.fetchRoomState();
     } catch (error) {
-      console.error('Error initializing room:', error);
+      console.error('❌ Error initializing room:', error);
     }
   }
 
