@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { store } from '@/lib/store';
 import { useRoomState } from '@/lib/hooks/useRoomState';
 import { Timer } from '@/components/Timer';
+import Link from 'next/link';
 
 const HOST_KEY = 'edc2026';
 
@@ -105,6 +106,12 @@ export default function HostPage() {
               Round {roomState.currentIndex + 1} of {roomState.openingOrder.length}
             </div>
           )}
+          <Link
+            href="/results"
+            className="inline-block mt-4 text-blue-600 hover:text-blue-800 text-lg font-semibold underline"
+          >
+            📊 View Results Dashboard
+          </Link>
         </div>
 
         {/* Main Content */}

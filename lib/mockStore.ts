@@ -3,24 +3,10 @@
 
 import { RoomState, Submission, RoomStateListener } from './types';
 
-// All 16 player names
+// Player names (2 for testing, can be expanded to 16)
 export const ALL_PLAYERS = [
   'Alice',
   'Bob',
-  'Charlie',
-  'Diana',
-  'Eve',
-  'Frank',
-  'Grace',
-  'Henry',
-  'Ivy',
-  'Jack',
-  'Karen',
-  'Leo',
-  'Mia',
-  'Noah',
-  'Olivia',
-  'Peter',
 ];
 
 class MockStore {
@@ -115,6 +101,16 @@ class MockStore {
   hasSubmitted(playerName: string, roundIndex: number): boolean {
     const key = `${playerName}-${roundIndex}`;
     return this.submissions.has(key);
+  }
+
+  // Get all submissions
+  getAllSubmissions(): any[] {
+    return Array.from(this.submissions.values()).map((sub) => ({
+      player_name: sub.playerName,
+      round_index: sub.roundIndex,
+      guessed_santa_name: sub.guessedSantaName,
+      created_at: new Date(sub.timestamp).toISOString(),
+    }));
   }
 
   // Get current recipient name

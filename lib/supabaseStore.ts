@@ -7,24 +7,10 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, hasValidCredentials } from './supabase';
 import { RoomState, RoomStateListener } from './types';
 
-// All 16 player names
+// Player names (2 for testing, can be expanded to 16)
 export const ALL_PLAYERS = [
   'Alice',
   'Bob',
-  'Charlie',
-  'Diana',
-  'Eve',
-  'Frank',
-  'Grace',
-  'Henry',
-  'Ivy',
-  'Jack',
-  'Karen',
-  'Leo',
-  'Mia',
-  'Noah',
-  'Olivia',
-  'Peter',
 ];
 
 // Default room ID - in production, you might generate this per session
@@ -341,6 +327,27 @@ class SupabaseStore {
     } catch (error) {
       console.error('Error checking submission:', error);
       return false;
+    }
+  }
+
+  // Get all submissions for the current room
+  async getAllSubmissions(): Promise<any[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('room_id', this.roomId)
+        .order('round_index', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+      return [];
     }
   }
 
