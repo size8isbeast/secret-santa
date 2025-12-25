@@ -6,6 +6,7 @@ import { useRoomState } from '@/lib/hooks/useRoomState';
 import { useTimer } from '@/lib/hooks/useTimer';
 import { Timer } from '@/components/Timer';
 import Link from 'next/link';
+import { LocalStorage } from '@/lib/localStorage';
 
 const HOST_KEY = 'edc2026';
 
@@ -63,9 +64,10 @@ export default function HostPage() {
     store.nextRecipient();
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset the game?')) {
-      store.reset();
+  const handleReset = async () => {
+    if (confirm('Are you sure you want to reset the game? This will clear all player data.')) {
+      await store.reset();
+      LocalStorage.clearAll();
     }
   };
 

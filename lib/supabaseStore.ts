@@ -93,6 +93,8 @@ class SupabaseStore {
           durationSec: data.duration_sec || 90,
           isStarted: data.is_started || false,
           resultsUnlocked: data.results_unlocked || false,
+          pollUnlocked: data.poll_unlocked || false,
+          sweaterPollUnlocked: data.sweater_poll_unlocked || false,
         };
         this.notifyListeners();
       }
@@ -128,6 +130,8 @@ class SupabaseStore {
               durationSec: data.duration_sec || 90,
               isStarted: data.is_started || false,
               resultsUnlocked: data.results_unlocked || false,
+              pollUnlocked: data.poll_unlocked || false,
+              sweaterPollUnlocked: data.sweater_poll_unlocked || false,
             };
             console.log('🟢 State updated:', this.currentState);
             this.notifyListeners();
@@ -183,6 +187,8 @@ class SupabaseStore {
         durationSec: 90,
         isStarted: false,
         resultsUnlocked: false,
+        pollUnlocked: false,
+        sweaterPollUnlocked: false,
       }
     );
   }
@@ -320,7 +326,8 @@ class SupabaseStore {
   async submitGuess(
     playerName: string,
     roundIndex: number,
-    guessedSantaName: string
+    guessedSantas: string[],
+    gameMode: 'risk' | 'safe' = 'risk'
   ): Promise<boolean> {
     if (!supabase) return false;
 
@@ -329,7 +336,9 @@ class SupabaseStore {
         room_id: this.roomId,
         player_name: playerName,
         round_index: roundIndex,
-        guessed_santa_name: guessedSantaName,
+        guessed_santa_name: guessedSantas[0] || '', // Legacy field
+        guessed_santas: guessedSantas,
+        game_mode: gameMode,
       });
 
       if (error) {
@@ -445,6 +454,288 @@ class SupabaseStore {
     }
   }
 
+  // Unlock poll (called when host clicks "One More Thing")
+  async unlockPoll(): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      await supabase
+        .from('rooms')
+        .update({ poll_unlocked: true })
+        .eq('id', this.roomId);
+
+      // Fetch updated state
+      await this.fetchRoomState();
+    } catch (error) {
+      console.error('Error unlocking poll:', error);
+    }
+  }
+
+  // Set the actual Santa for a round
+  async setActualSanta(roundIndex: number, actualSantaName: string): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      // Upsert (insert or update if exists)
+      await supabase
+        .from('actual_santas')
+        .upsert({
+          room_id: this.roomId,
+          round_index: roundIndex,
+          actual_santa_name: actualSantaName,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'room_id,round_index'
+        });
+    } catch (error) {
+      console.error('Error setting actual Santa:', error);
+    }
+  }
+
+  // Get the actual Santa for a round
+  async getActualSanta(roundIndex: number): Promise<string | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('actual_santas')
+        .select('actual_santa_name')
+        .eq('room_id', this.roomId)
+        .eq('round_index', roundIndex)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows returned
+        throw error;
+      }
+
+      return data?.actual_santa_name ?? null;
+    } catch (error) {
+      console.error('Error getting actual Santa:', error);
+      return null;
+    }
+  }
+
+  // Get all actual Santas
+  async getAllActualSantas(): Promise<Record<number, string>> {
+    if (!supabase) return {};
+
+    try {
+      const { data, error } = await supabase
+        .from('actual_santas')
+        .select('round_index, actual_santa_name')
+        .eq('room_id', this.roomId)
+        .order('round_index', { ascending: true });
+
+      if (error) throw error;
+
+      const result: Record<number, string> = {};
+      data?.forEach((row) => {
+        result[row.round_index] = row.actual_santa_name;
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error getting all actual Santas:', error);
+      return {};
+    }
+  }
+
+  // Poll: Submit vote for best gift sender
+  async submitPollVote(voterName: string, votedFor: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('supabaseStore.submitPollVote: Supabase client not available');
+      return false;
+    }
+
+    console.log('supabaseStore.submitPollVote called:', { voterName, votedFor, roomId: this.roomId });
+
+    try {
+      const { error } = await supabase.from('poll_votes').insert({
+        room_id: this.roomId,
+        voter_name: voterName,
+        voted_for: votedFor,
+      });
+
+      if (error) {
+        // Check if it's a unique constraint violation (already voted)
+        if (error.code === '23505') {
+          console.log('Vote rejected: voter already voted (unique constraint)');
+          return false;
+        }
+        console.error('Database error inserting vote:', error);
+        throw error;
+      }
+
+      console.log('Vote submitted successfully to database');
+      return true;
+    } catch (error) {
+      console.error('Error submitting poll vote:', error);
+      return false;
+    }
+  }
+
+  // Poll: Check if player has voted
+  async hasVoted(voterName: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('poll_votes')
+        .select('id')
+        .eq('room_id', this.roomId)
+        .eq('voter_name', voterName)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error checking vote:', error);
+      return false;
+    }
+  }
+
+  // Poll: Get all votes
+  async getAllPollVotes(): Promise<Array<{ voter_name: string; voted_for: string }>> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('poll_votes')
+        .select('voter_name, voted_for')
+        .eq('room_id', this.roomId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching poll votes:', error);
+      return [];
+    }
+  }
+
+  // Poll: Get vote counts
+  async getPollResults(): Promise<Record<string, number>> {
+    const votes = await this.getAllPollVotes();
+    const results: Record<string, number> = {};
+
+    votes.forEach((vote) => {
+      results[vote.voted_for] = (results[vote.voted_for] || 0) + 1;
+    });
+
+    return results;
+  }
+
+  // Sweater Poll: Unlock sweater poll (called when host clicks "One More Thing" after gift poll)
+  async unlockSweaterPoll(): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      await supabase
+        .from('rooms')
+        .update({ sweater_poll_unlocked: true })
+        .eq('id', this.roomId);
+
+      // Fetch updated state
+      await this.fetchRoomState();
+    } catch (error) {
+      console.error('Error unlocking sweater poll:', error);
+    }
+  }
+
+  // Sweater Poll: Submit vote for ugliest sweater
+  async submitSweaterVote(voterName: string, votedFor: string): Promise<boolean> {
+    if (!supabase) {
+      console.error('supabaseStore.submitSweaterVote: Supabase client not available');
+      return false;
+    }
+
+    console.log('supabaseStore.submitSweaterVote called:', { voterName, votedFor, roomId: this.roomId });
+
+    try {
+      const { error } = await supabase.from('sweater_votes').insert({
+        room_id: this.roomId,
+        voter_name: voterName,
+        voted_for: votedFor,
+      });
+
+      if (error) {
+        // Check if it's a unique constraint violation (already voted)
+        if (error.code === '23505') {
+          console.log('Sweater vote rejected: voter already voted (unique constraint)');
+          return false;
+        }
+        console.error('Database error inserting sweater vote:', error);
+        throw error;
+      }
+
+      console.log('Sweater vote submitted successfully to database');
+      return true;
+    } catch (error) {
+      console.error('Error submitting sweater vote:', error);
+      return false;
+    }
+  }
+
+  // Sweater Poll: Check if player has voted for sweater
+  async hasSweaterVoted(voterName: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('sweater_votes')
+        .select('id')
+        .eq('room_id', this.roomId)
+        .eq('voter_name', voterName)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error checking sweater vote:', error);
+      return false;
+    }
+  }
+
+  // Sweater Poll: Get all sweater votes
+  async getAllSweaterVotes(): Promise<Array<{ voter_name: string; voted_for: string }>> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('sweater_votes')
+        .select('voter_name, voted_for')
+        .eq('room_id', this.roomId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching sweater votes:', error);
+      return [];
+    }
+  }
+
+  // Sweater Poll: Get vote counts
+  async getSweaterPollResults(): Promise<Record<string, number>> {
+    const votes = await this.getAllSweaterVotes();
+    const results: Record<string, number> = {};
+
+    votes.forEach((vote) => {
+      results[vote.voted_for] = (results[vote.voted_for] || 0) + 1;
+    });
+
+    return results;
+  }
+
   // Reset the entire game
   async reset(): Promise<void> {
     if (!supabase) return;
@@ -460,11 +751,16 @@ class SupabaseStore {
           is_started: false,
           active_players: [],
           results_unlocked: false,
+          poll_unlocked: false,
+          sweater_poll_unlocked: false,
         })
         .eq('id', this.roomId);
 
-      // Delete all submissions for this room
+      // Delete all data for this room
       await supabase.from('submissions').delete().eq('room_id', this.roomId);
+      await supabase.from('actual_santas').delete().eq('room_id', this.roomId);
+      await supabase.from('poll_votes').delete().eq('room_id', this.roomId);
+      await supabase.from('sweater_votes').delete().eq('room_id', this.roomId);
     } catch (error) {
       console.error('Error resetting game:', error);
     }

@@ -14,29 +14,6 @@ export default function Home() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Host Card */}
-          <Link href="/host">
-            <div className="bg-white rounded-3xl shadow-2xl p-12 hover:scale-105 transition-transform cursor-pointer border-4 border-transparent hover:border-red-500">
-              <div className="text-center">
-                <div className="text-7xl mb-6">🖥️</div>
-                <h2 className="text-4xl font-bold text-gray-800 mb-4">
-                  Host / Projector
-                </h2>
-                <p className="text-xl text-gray-600 mb-6">
-                  Control the game flow, show the current recipient, and manage the timer
-                </p>
-                <div className="bg-red-100 rounded-xl p-4">
-                  <ul className="text-left text-gray-700 space-y-2">
-                    <li>• Start the game</li>
-                    <li>• Display current recipient</li>
-                    <li>• Show countdown timer</li>
-                    <li>• Advance to next person</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </Link>
-
           {/* Player Card */}
           <Link href="/player">
             <div className="bg-white rounded-3xl shadow-2xl p-12 hover:scale-105 transition-transform cursor-pointer border-4 border-transparent hover:border-blue-500">
@@ -54,6 +31,29 @@ export default function Home() {
                     <li>• See current recipient</li>
                     <li>• Submit your guess</li>
                     <li>• Skip when it&apos;s your turn</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Host Card */}
+          <Link href="/host">
+            <div className="bg-white rounded-3xl shadow-2xl p-12 hover:scale-105 transition-transform cursor-pointer border-4 border-transparent hover:border-red-500">
+              <div className="text-center">
+                <div className="text-7xl mb-6">🖥️</div>
+                <h2 className="text-4xl font-bold text-gray-800 mb-4">
+                  Host / Projector
+                </h2>
+                <p className="text-xl text-gray-600 mb-6">
+                  Control the game flow, show the current recipient, and manage the timer
+                </p>
+                <div className="bg-red-100 rounded-xl p-4">
+                  <ul className="text-left text-gray-700 space-y-2">
+                    <li>• Start the game</li>
+                    <li>• Display current recipient</li>
+                    <li>• Show countdown timer</li>
+                    <li>• Advance to next person</li>
                   </ul>
                 </div>
               </div>

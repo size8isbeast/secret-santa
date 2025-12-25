@@ -17,10 +17,15 @@ class MockStore {
     durationSec: 90, // Default 90 seconds per round
     isStarted: false,
     resultsUnlocked: false,
+    pollUnlocked: false,
+    sweaterPollUnlocked: false,
   };
 
   private activePlayers: Set<string> = new Set();
   private submissions: Map<string, Submission> = new Map();
+  private actualSantas: Map<number, string> = new Map(); // round_index -> actual_santa_name
+  private pollVotes: Map<string, string> = new Map(); // voter_name -> voted_for
+  private sweaterVotes: Map<string, string> = new Map(); // voter_name -> voted_for
   private listeners: Set<RoomStateListener> = new Set();
 
   // Subscribe to room state changes (simulates Supabase Realtime)
@@ -92,7 +97,12 @@ class MockStore {
   }
 
   // Player: Submit a guess for current round
-  submitGuess(playerName: string, roundIndex: number, guessedSantaName: string): boolean {
+  submitGuess(
+    playerName: string,
+    roundIndex: number,
+    guessedSantas: string[],
+    gameMode: 'risk' | 'safe' = 'risk'
+  ): boolean {
     // Check if already submitted for this round
     const key = `${playerName}-${roundIndex}`;
     if (this.submissions.has(key)) {
@@ -102,7 +112,9 @@ class MockStore {
     const submission: Submission = {
       playerName,
       roundIndex,
-      guessedSantaName,
+      guessedSantaName: guessedSantas[0] || '', // Legacy field
+      guessedSantas,
+      gameMode,
       timestamp: Date.now(),
     };
     this.submissions.set(key, submission);
@@ -121,6 +133,8 @@ class MockStore {
       player_name: sub.playerName,
       round_index: sub.roundIndex,
       guessed_santa_name: sub.guessedSantaName,
+      guessed_santas: sub.guessedSantas,
+      game_mode: sub.gameMode,
       created_at: new Date(sub.timestamp).toISOString(),
     }));
   }
@@ -147,8 +161,117 @@ class MockStore {
     this.notifyListeners();
   }
 
+  // Unlock poll (called when host clicks "One More Thing")
+  unlockPoll(): void {
+    this.roomState = {
+      ...this.roomState,
+      pollUnlocked: true,
+    };
+    this.notifyListeners();
+  }
+
+  // Set the actual Santa for a round
+  setActualSanta(roundIndex: number, actualSantaName: string): void {
+    this.actualSantas.set(roundIndex, actualSantaName);
+  }
+
+  // Get the actual Santa for a round
+  getActualSanta(roundIndex: number): string | null {
+    return this.actualSantas.get(roundIndex) ?? null;
+  }
+
+  // Get all actual Santas
+  getAllActualSantas(): Record<number, string> {
+    const result: Record<number, string> = {};
+    this.actualSantas.forEach((santa, roundIndex) => {
+      result[roundIndex] = santa;
+    });
+    return result;
+  }
+
+  // Poll: Submit vote for best gift sender
+  submitPollVote(voterName: string, votedFor: string): boolean {
+    console.log('mockStore.submitPollVote called:', { voterName, votedFor });
+    if (this.pollVotes.has(voterName)) {
+      console.log('Vote rejected: voter already voted');
+      return false; // Already voted
+    }
+    this.pollVotes.set(voterName, votedFor);
+    console.log('Vote submitted successfully. Total votes:', this.pollVotes.size);
+    return true;
+  }
+
+  // Poll: Check if player has voted
+  hasVoted(voterName: string): boolean {
+    return this.pollVotes.has(voterName);
+  }
+
+  // Poll: Get all votes
+  getAllPollVotes(): Array<{ voter_name: string; voted_for: string }> {
+    const votes = Array.from(this.pollVotes.entries()).map(([voter, votedFor]) => ({
+      voter_name: voter,
+      voted_for: votedFor,
+    }));
+    console.log('📊 mockStore.getAllPollVotes() returning', votes.length, 'votes');
+    return votes;
+  }
+
+  // Poll: Get vote counts
+  getPollResults(): Record<string, number> {
+    const results: Record<string, number> = {};
+    this.pollVotes.forEach((votedFor) => {
+      results[votedFor] = (results[votedFor] || 0) + 1;
+    });
+    return results;
+  }
+
+  // Sweater Poll: Unlock sweater poll (called when host clicks "One More Thing" after gift poll)
+  unlockSweaterPoll(): void {
+    this.roomState = {
+      ...this.roomState,
+      sweaterPollUnlocked: true,
+    };
+    this.notifyListeners();
+  }
+
+  // Sweater Poll: Submit vote for ugliest sweater
+  submitSweaterVote(voterName: string, votedFor: string): boolean {
+    console.log('mockStore.submitSweaterVote called:', { voterName, votedFor });
+    if (this.sweaterVotes.has(voterName)) {
+      console.log('Sweater vote rejected: voter already voted');
+      return false; // Already voted
+    }
+    this.sweaterVotes.set(voterName, votedFor);
+    console.log('Sweater vote submitted successfully. Total votes:', this.sweaterVotes.size);
+    return true;
+  }
+
+  // Sweater Poll: Check if player has voted for sweater
+  hasSweaterVoted(voterName: string): boolean {
+    return this.sweaterVotes.has(voterName);
+  }
+
+  // Sweater Poll: Get all sweater votes
+  getAllSweaterVotes(): Array<{ voter_name: string; voted_for: string }> {
+    const votes = Array.from(this.sweaterVotes.entries()).map(([voter, votedFor]) => ({
+      voter_name: voter,
+      voted_for: votedFor,
+    }));
+    console.log('🎄 mockStore.getAllSweaterVotes() returning', votes.length, 'votes');
+    return votes;
+  }
+
+  // Sweater Poll: Get vote counts
+  getSweaterPollResults(): Record<string, number> {
+    const results: Record<string, number> = {};
+    this.sweaterVotes.forEach((votedFor) => {
+      results[votedFor] = (results[votedFor] || 0) + 1;
+    });
+    return results;
+  }
+
   // Reset the entire game (for testing)
-  reset(): void {
+  async reset(): Promise<void> {
     this.roomState = {
       openingOrder: [],
       currentIndex: 0,
@@ -156,9 +279,15 @@ class MockStore {
       durationSec: 90,
       isStarted: false,
       resultsUnlocked: false,
+      pollUnlocked: false,
+      sweaterPollUnlocked: false,
     };
     this.activePlayers.clear();
     this.submissions.clear();
+    this.actualSantas.clear();
+    this.pollVotes.clear();
+    this.sweaterVotes.clear();
+
     this.notifyListeners();
   }
 }
