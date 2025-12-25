@@ -68,6 +68,8 @@ class MockStore {
       durationSec: this.roomState.durationSec,
       isStarted: true,
       resultsUnlocked: false,
+      pollUnlocked: false,
+      sweaterPollUnlocked: false,
     };
     this.notifyListeners();
   }
