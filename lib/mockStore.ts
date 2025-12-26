@@ -2,6 +2,7 @@
 // Later this will be replaced with Supabase Realtime + tables
 
 import { RoomState, Submission, RoomStateListener } from './types';
+import { DEFAULT_TIMER_DURATION_SEC } from './constants';
 
 // Player names (2 for testing, can be expanded to 16)
 export const ALL_PLAYERS = [
@@ -14,7 +15,7 @@ class MockStore {
     openingOrder: [],
     currentIndex: 0,
     roundStartedAt: null,
-    durationSec: 90, // Default 90 seconds per round
+    durationSec: DEFAULT_TIMER_DURATION_SEC,
     isStarted: false,
     resultsUnlocked: false,
     pollUnlocked: false,
@@ -278,7 +279,7 @@ class MockStore {
       openingOrder: [],
       currentIndex: 0,
       roundStartedAt: null,
-      durationSec: 90,
+      durationSec: DEFAULT_TIMER_DURATION_SEC,
       isStarted: false,
       resultsUnlocked: false,
       pollUnlocked: false,
