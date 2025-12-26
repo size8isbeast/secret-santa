@@ -18,6 +18,9 @@ export default function HostPage() {
 
   const roomState = useRoomState();
   const currentRecipient = store.getCurrentRecipient();
+  const nextRecipient = roomState.isStarted && roomState.currentIndex < roomState.openingOrder.length - 1
+    ? roomState.openingOrder[roomState.currentIndex + 1]
+    : null;
   const isLastRound =
     roomState.isStarted &&
     roomState.currentIndex >= roomState.openingOrder.length - 1;
@@ -190,9 +193,17 @@ export default function HostPage() {
             {/* Current Recipient Card */}
             <div className="bg-white rounded-3xl shadow-2xl p-16 text-center">
               <div className="text-4xl text-gray-600 mb-4">Now Opening:</div>
-              <div className="text-9xl font-bold text-red-600 mb-12">
+              <div className="text-9xl font-bold bg-gradient-to-r from-red-600 via-green-600 to-red-600 bg-clip-text text-transparent mb-8">
                 {currentRecipient}
               </div>
+              {nextRecipient && (
+                <div className="mb-8">
+                  <div className="text-2xl text-gray-500 mb-2">Next Up:</div>
+                  <div className="text-4xl font-bold text-gray-700">
+                    {nextRecipient}
+                  </div>
+                </div>
+              )}
               <Timer
                 startedAt={roomState.roundStartedAt}
                 durationSec={roomState.durationSec}

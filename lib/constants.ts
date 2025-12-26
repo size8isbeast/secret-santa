@@ -2,7 +2,7 @@
 
 // Room Configuration
 export const DEFAULT_ROOM_ID = '00000000-0000-0000-0000-000000000001';
-export const DEFAULT_TIMER_DURATION_SEC = 90;
+export const DEFAULT_TIMER_DURATION_SEC = 180;
 
 // Polling Intervals (milliseconds)
 export const VOTE_POLLING_INTERVAL_MS = 2000;
