@@ -6,6 +6,7 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, hasValidCredentials } from './supabase';
 import { RoomState, RoomStateListener } from './types';
+import { DEFAULT_TIMER_DURATION_SEC } from './constants';
 
 // Player names (2 for testing, can be expanded to 16)
 export const ALL_PLAYERS = [
@@ -56,7 +57,7 @@ class SupabaseStore {
           opening_order: [],
           current_index: 0,
           round_started_at: null,
-          duration_sec: 90,
+          duration_sec: DEFAULT_TIMER_DURATION_SEC,
           is_started: false,
         });
       } else {
@@ -90,7 +91,7 @@ class SupabaseStore {
           roundStartedAt: data.round_started_at
             ? new Date(data.round_started_at).getTime()
             : null,
-          durationSec: data.duration_sec || 90,
+          durationSec: data.duration_sec || DEFAULT_TIMER_DURATION_SEC,
           isStarted: data.is_started || false,
           resultsUnlocked: data.results_unlocked || false,
           pollUnlocked: data.poll_unlocked || false,

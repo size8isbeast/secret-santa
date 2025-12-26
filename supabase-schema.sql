@@ -10,7 +10,7 @@ create table if not exists rooms (
   opening_order text[] default '{}',
   current_index integer default 0,
   round_started_at timestamptz,
-  duration_sec integer default 90,
+  duration_sec integer default 180,
   is_started boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

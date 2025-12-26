@@ -29,6 +29,9 @@ export default function PlayerPage() {
   const [hasSubmittedThisRound, setHasSubmittedThisRound] = useState(false);
 
   const currentRecipient = store.getCurrentRecipient();
+  const nextRecipient = roomState.isStarted && roomState.currentIndex < roomState.openingOrder.length - 1
+    ? roomState.openingOrder[roomState.currentIndex + 1]
+    : null;
   const isRecipient = playerName === currentRecipient;
   const roundIndex = roomState.currentIndex;
   const isLastRound =
@@ -225,9 +228,17 @@ export default function PlayerPage() {
             You are <span className="font-bold text-blue-600">{playerName}</span>
           </div>
           <div className="text-3xl text-gray-700 mb-1">Currently opening:</div>
-          <div className="text-6xl font-bold text-red-600 mb-6">
+          <div className="text-6xl font-bold text-red-600 mb-2">
             {currentRecipient}
           </div>
+          {nextRecipient && (
+            <div className="mb-4">
+              <div className="text-lg text-gray-500 mb-1">Next Up:</div>
+              <div className="text-2xl font-bold text-gray-700">
+                {nextRecipient}
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <Timer
               startedAt={roomState.roundStartedAt}

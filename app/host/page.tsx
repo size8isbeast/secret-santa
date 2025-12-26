@@ -193,7 +193,7 @@ export default function HostPage() {
             {/* Current Recipient Card */}
             <div className="bg-white rounded-3xl shadow-2xl p-16 text-center">
               <div className="text-4xl text-gray-600 mb-4">Now Opening:</div>
-              <div className="text-9xl font-bold bg-gradient-to-r from-red-600 via-green-600 to-red-600 bg-clip-text text-transparent mb-8">
+              <div className="text-9xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-8">
                 {currentRecipient}
               </div>
               {nextRecipient && (
